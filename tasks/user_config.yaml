@@ -1,0 +1,58 @@
+---
+# Linger support for user to use podman
+- name: systemd linger is enabled for user {{ podman_user }}
+  become: true
+  ansible.builtin.command:
+    cmd: /usr/bin/loginctl enable-linger {{ podman_user | ansible.builtin.quote }}
+    creates: /var/lib/systemd/linger/{{ podman_user }}
+# Setup subuid/subgid settings
+- name: podman user {{ podman_user }} subuid entry exists is known
+  ansible.builtin.command: /usr/bin/grep -q {{ podman_user | ansible.builtin.quote }} /etc/subuid
+  register: podman_subuid_status
+  failed_when: podman_subuid_status.rc not in [0, 1]  # 1 if not found
+  changed_when: false  # Read-only command
+- name: podman user {{ podman_user }} subgid entry exists is known
+  ansible.builtin.command: /usr/bin/grep -q {{ podman_user | ansible.builtin.quote }} /etc/subgid
+  register: podman_subgid_status
+  failed_when: podman_subgid_status.rc not in [0, 1]  # 1 if not found
+  changed_when: false  # Read-only command
+- name: podman user {{ podman_user }} subuid is setup
+  block:
+    - name: Maximum subuid is known
+      ansible.builtin.shell: "/usr/bin/sort -t: -k2 /etc/subuid | /usr/bin/tail -n1"
+      register: podman_max_subuid
+      changed_when: false  # Read-only command
+    - name: subuid range start is known
+      ansible.builtin.set_fact:
+        podman_user_subuid_start: "{{ (podman_max_subuid.stdout.split(':')[1] | int) + (podman_max_subuid.stdout.split(':')[2] | int) + 1 }}"
+      when: podman_max_subuid.stdout | length > 0
+    - name: subuid range start is set (if no existing range)
+      ansible.builtin.set_fact:
+        podman_user_subuid_start: 100000
+      when: podman_max_subuid.stdout | length == 0
+    - name: subuid is configured
+      become: true
+      ansible.builtin.command: /usr/sbin/usermod -v {{ podman_user_subuid_start }}-{{ podman_user_subuid_start | int + podman_user_subuid_range_size }} {{ podman_user | ansible.builtin.quote }}
+  when: podman_subuid_status.rc == 1
+- name: podman user {{ podman_user }} subgid is setup
+  block:
+    - name: Maximum subgid is known
+      ansible.builtin.shell: "/usr/bin/sort -t: -k2 /etc/subgid | /usr/bin/tail -n1"
+      register: podman_max_subgid
+      changed_when: false  # Read-only command
+    - name: subgid range start is known
+      ansible.builtin.set_fact:
+        podman_user_subgid_start: "{{ (podman_max_subgid.stdout.split(':')[1] | int) + (podman_max_subgid.stdout.split(':')[2] | int) + 1}}"
+      when: podman_max_subgid.stdout | length > 0
+    - name: subgid range start is set (if no existing range)
+      ansible.builtin.set_fact:
+        podman_user_subgid_start: 100000
+      when: podman_max_subgid.stdout | length == 0
+    - name: subgid is configured
+      become: true
+      ansible.builtin.command: /usr/sbin/usermod -w {{ podman_user_subgid_start }}-{{ podman_user_subgid_start | int + podman_user_subgid_range_size }} {{ podman_user | ansible.builtin.quote }}
+  when: podman_subgid_status.rc == 1
+- name: Podman is told to refresh subuid/subgid if changed
+  ansible.builtin.command: /usr/bin/podman system migrate
+  when: podman_subuid_status.rc == 1 or podman_subgid_status.rc == 1
+...

@@ -1,0 +1,20 @@
+---
+argument_specs:
+  main:
+    short_description: Installs podman and configures rootless podman users
+    author: Laurence Alexander Hurst
+    options:
+      podman_users:
+        description: User accounts to configure for rootless podman
+        type: list
+        default: []
+        elements: str
+      podman_user_subuid_range_size:
+        description: Size of rootless users' subuid range
+        type: int
+        default: 65536
+      podman_user_subgid_range_size:
+        description: Size of rootless users' subgid range
+        type: int
+        default: 65536
+...

@@ -1,0 +1,16 @@
+---
+- name: Podman is installed
+  become: true
+  ansible.builtin.package:
+    name: podman
+- name: containers-storage is installed on Debian
+  become: true
+  ansible.builtin.package:
+    name: containers-storage
+  when: ansible_facts.distribution == 'Debian'
+- name: Podman users are configured
+  ansible.builtin.include_tasks: user_config.yaml
+  loop: '{{ podman_users }}'
+  loop_control:
+    loop_var: podman_user
+...
