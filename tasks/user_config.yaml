@@ -11,17 +11,20 @@
   register: podman_subuid_status
   failed_when: podman_subuid_status.rc not in [0, 1]  # 1 if not found
   changed_when: false  # Read-only command
+  check_mode: false  # Can safely run read-only commands in check mode
 - name: podman user {{ podman_user }} subgid entry exists is known
   ansible.builtin.command: /usr/bin/grep -q {{ podman_user | ansible.builtin.quote }} /etc/subgid
   register: podman_subgid_status
   failed_when: podman_subgid_status.rc not in [0, 1]  # 1 if not found
   changed_when: false  # Read-only command
+  check_mode: false  # Can safely run read-only commands in check mode
 - name: podman user {{ podman_user }} subuid is setup
   block:
     - name: Maximum subuid is known
       ansible.builtin.shell: "/usr/bin/sort -t: -k2 /etc/subuid | /usr/bin/tail -n1"
       register: podman_max_subuid
       changed_when: false  # Read-only command
+      check_mode: false  # Can safely run read-only commands in check mode
     - name: subuid range start is known
       ansible.builtin.set_fact:
         podman_user_subuid_start: "{{ (podman_max_subuid.stdout.split(':')[1] | int) + (podman_max_subuid.stdout.split(':')[2] | int) + 1 }}"
@@ -40,6 +43,7 @@
       ansible.builtin.shell: "/usr/bin/sort -t: -k2 /etc/subgid | /usr/bin/tail -n1"
       register: podman_max_subgid
       changed_when: false  # Read-only command
+      check_mode: false  # Can safely run read-only commands in check mode
     - name: subgid range start is known
       ansible.builtin.set_fact:
         podman_user_subgid_start: "{{ (podman_max_subgid.stdout.split(':')[1] | int) + (podman_max_subgid.stdout.split(':')[2] | int) + 1}}"
