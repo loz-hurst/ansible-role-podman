@@ -13,7 +13,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-podman_users: []
-podman_user_subuid_range_size: 65536  # Just the default range size
-podman_user_subgid_range_size: 65536  # Just the default range size
+galaxy_info:
+  role_name: podman
+  author: Laurence Alexander Hurst
+  description: Ansible role for managing podman
+  license: GPLv3
+  # Not been tested on anything prior to this - may work but YMMV
+  min_ansible_version: 2.15.13
 ...
