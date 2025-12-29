@@ -1,0 +1,111 @@
+---
+# Copyright 2025 Laurence Alexander Hurst
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+- name: Info is gathered on base image {{ podman_image_base_image }}
+  become: true
+  become_user: '{{ podman_image_build_user }}'
+  containers.podman.podman_image_info:
+    name: '{{ podman_image_base_image }}'
+  register: podman_image_base_info
+- name: Base image {{ podman_image_base_image }} is fetched if missing
+  become: true
+  become_user: '{{ podman_image_build_user }}'
+  containers.podman.podman_image:
+    name: '{{ podman_image_base_image }}'
+    force: true
+  when: >-
+    podman_image_fetch_base
+    and
+    podman_image_base_info.images | length == 0
+  register: podman_image_base_image_updated
+- name: Info is gathered on base image {{ podman_image_base_image }} again (in case it was fetched)
+  become: true
+  become_user: '{{ podman_image_build_user }}'
+  containers.podman.podman_image_info:
+    name: '{{ podman_image_base_image }}'
+  register: podman_image_base_info
+- name: Base image {{ podman_image_base_image }} exists
+  ansible.builtin.assert:
+    that: podman_image_base_info.images | length > 0
+    fail_msg: Base image must exist to check if we need to build a new one!
+- name: Info is gathered on image {{ podman_image_name }}
+  become: true
+  become_user: '{{ podman_image_build_user }}'
+  containers.podman.podman_image_info:
+    name: '{{ podman_image_name }}'
+  register: podman_image_info
+- name: Image {{ podman_image_name }} is correct
+  block:
+    - name: Context folder exists
+      become: true
+      become_user: '{{ podman_image_build_user }}'
+      ansible.builtin.tempfile:
+        state: directory
+      register: build_context_path
+    - name: New {{ podman_image_name }} image is built
+      become: true
+      become_user: '{{ podman_image_build_user }}'
+      containers.podman.podman_image:
+        name: '{{ podman_image_name }}'
+        path: '{{ build_context_path.path }}'
+        state: build
+        force: true
+        build:
+          cache: false
+          force_rm: true
+          container_file: '{{ podman_image_container_file }}'
+          extra_args: "{% for item in podman_image_build_args %}\
+            --build-arg \
+            {{ item.name | ansible.builtin.quote }}\
+            =\
+            {{ item.value | ansible.builtin.quote }}\
+            {% if not loop.last %} {% endif %}\
+            {% endfor %}"
+      register: podman_image_new_image_built
+  always:
+    - name: Build context is absent
+      become: true
+      become_user: '{{ podman_image_build_user }}'
+      ansible.builtin.file:
+        path: '{{ build_context_path.path }}'
+        state: absent
+      when: build_context_path is defined
+  # In some edge cases (e.g. changing the base image), the base might be
+  # changed but older then the previously built custom image.
+  when: >-
+    podman_image_base_image_updated.changed | default(False)
+    or
+    podman_image_info.images | length == 0
+    or
+    base_created_short | ansible.builtin.to_datetime(iso8601format) > image_created_short | ansible.builtin.to_datetime(iso8601format)
+  vars:
+    # Taken from the example at:
+    # https://docs.ansible.com/ansible/latest/collections/ansible/builtin/to_datetime_filter.html
+    iso8601format: '%Y-%m-%dT%H:%M:%S.%fZ'
+    # shorten to microseconds, make sure there's a fractional
+    # component to match format string.
+    base_created_short: >-
+      {{
+        podman_image_base_info.images[0].Created
+        | regex_replace("([^.]+)(\.\d{6})(\d*)(.+)", "\1\2\4")
+        | regex_replace("(:[0-9]+)Z$", "\1.0Z")
+      }}
+    image_created_short: >-
+      {{
+        podman_image_info.images[0].Created
+        | regex_replace("([^.]+)(\.\d{6})(\d*)(.+)", "\1\2\4")
+        | regex_replace("(:[0-9]+)Z$", "\1.0Z")
+      }}
+...
