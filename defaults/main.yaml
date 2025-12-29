@@ -16,4 +16,6 @@
 podman_users: []
 podman_user_subuid_range_size: 65536  # Just the default range size
 podman_user_subgid_range_size: 65536  # Just the default range size
+podman_image_fetch_base: true
+podman_image_build_args: []
 ...

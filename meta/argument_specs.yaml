@@ -31,4 +31,42 @@ argument_specs:
         description: Size of rootless users' subgid range
         type: int
         default: 65536
+  build-image:
+    short_description: Build images for use by Podman
+    author: Laurence Alexander Hurst
+    options:
+      podman_image_build_user:
+        description: User to build container as
+        type: str
+        required: true
+      podman_image_base_image:
+        description: Name of the base image for building from
+        type: str
+        required: true
+      podman_image_fetch_base:
+        description: Fetch the base image if it does not exist (set to false if base image should have been previously built locally)
+        type: bool
+        default: true
+      podman_image_name:
+        description: Name of the image to build
+        type: str
+        required: true
+      podman_image_container_file:
+        description: Container for building the image
+        type: str
+        required: true
+      podman_image_build_args:
+        description: List of build args to pass to the build command with `--build-arg`
+        type: list
+        elements: dict
+        options:
+          name:
+            description: The argument name
+            type: str
+            required: true
+          value:
+            description: The argument value
+            type: str
+            required: true
+        default: []
 ...
